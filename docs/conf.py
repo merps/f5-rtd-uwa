@@ -3,13 +3,17 @@
 #
 # BEGIN CONFIG
 # ------------
+#
+# REQUIRED: Your class/lab name
+classname = "F5 Cloud Recommendations - UWA"
 
-git_branch_name = 'master'
+# OPTIONAL: The URL to the GitHub Repository for this class
 github_url = "https://github.com/merps/f5-rtd-uwa"
 
+git_branch_name = 'master'
 
 # OPTIONAL: Google Analytics
-# googleanalytics_id = 
+# googleanalytics_id = 'UA-85156643-4'
 
 #
 # END CONFIG
@@ -26,7 +30,7 @@ sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../'))
 
 year = time.strftime("%Y")
-eventname = "F5 %s Uni of WA - Recommendations" % (year)
+eventname = "F5 %s Read The Docs Guide" % (year)
 
 # -- General configuration ------------------------------------------------
 
@@ -88,7 +92,7 @@ source_suffix = ['.rst', '.md']
 master_doc = 'index'
 
 # General information about the project.
-project = u'F5 - Uni of WA Cloud Recommedations'
+project = u'F5 Read The Docs'
 copyright = u'F5 Networks, Inc.'
 author = u'F5 Networks, Inc.'
 
