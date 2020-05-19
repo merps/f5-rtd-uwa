@@ -5,6 +5,8 @@
 # ------------
 
 git_branch_name = 'master'
+github_url = "https://github.com/merps/f5-rtd-uwa"
+
 
 # OPTIONAL: Google Analytics
 # googleanalytics_id = 
