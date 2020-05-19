@@ -1,5 +1,5 @@
 sphinx<2.0
 recommonmark
-sphinx.themes.basicstrap
+sphinxjp.themes.basicstrap
 sphinxcontrib-googleanalytics
 cloud_sptheme
