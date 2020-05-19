@@ -11,7 +11,8 @@ Welcome to f5-uwa-cloud's documentation!
    :caption: Contents:
    :glob:
 
-   UWA-Recommendations*
+   docs/*
+   docs*/* 
 
 Indices and tables
 ==================
