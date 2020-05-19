@@ -1,0 +1,760 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>UWA Recommendations &#8212; f5-uwa-cloud Initial documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Welcome to f5-uwa-cloud’s documentation!" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="toctree-wrapper compound">
+</div>
+<div class="section" id="uwa-recommendations">
+<h1>UWA Recommendations<a class="headerlink" href="#uwa-recommendations" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="uwa-ingest-vnet">
+<h2>UWA - Ingest VNET.<a class="headerlink" href="#uwa-ingest-vnet" title="Permalink to this headline">¶</a></h2>
+<p>The approach, <a class="reference external" href="https://github.com/F5Networks/f5-azure-arm-templates/blob/master/supported/failover/same-net/via-lb/3nic/alternate-deployment-topologies.md">BIG-IP VE HA pair load balancing</a> for the transit VNET, deployed with HA Failover via LB template can easily fit into existing infrastructure without
+asking the customer to re-architect the entire infrastructure.  Of course, the main requirement of this use case is that SNAT is allowed when traffic reaches the F5 BIG-IP VE’s.</p>
+<div class="section" id="benefits">
+<h3>Benefits<a class="headerlink" href="#benefits" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>This solution works for both Reverse and Forward proxies use cases</p></li>
+<li><p>Minimal affect to the customer’s existing setup</p></li>
+<li><p>All the same benefits as HA failover-via LB solution</p></li>
+</ul>
+</div>
+<div class="section" id="requirements">
+<h3>Requirements:<a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>SNAT is required</p></li>
+<li><p>Azure Native Internal load balancer</p></li>
+</ul>
+<p>Following these deployment patterns it enables native Azure functionality, this includes the integration into Azure Security Center and consolidation logging framework that
+aligns the previously mentioned Cloud Security posture.</p>
+</div>
+</div>
+<div class="section" id="application-deployment-lifecycle">
+<h2>Application Deployment Lifecycle.<a class="headerlink" href="#application-deployment-lifecycle" title="Permalink to this headline">¶</a></h2>
+<p>As with all Cloud Journeys this document will outline the each stage and how F5’s vision of Code-To-Customer, it will be broken down into the following stages:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#provisioning">Provisioning</a></p></li>
+<li><p><a class="reference internal" href="#configuration">Configuration</a></p></li>
+<li><p><a class="reference internal" href="#monitoring-analytics">Monitoring &amp; Analytics</a></p></li>
+<li><p><a class="reference internal" href="#backup-and-restoration">Backup and Restoration</a></p></li>
+</ul>
+<p>With each stage outlined and tools details recommendations will be made of the Code-To-Customer approach.</p>
+</div>
+<div class="section" id="provisioning">
+<h2>Provisioning<a class="headerlink" href="#provisioning" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="arm-templates">
+<h3>ARM Templates<a class="headerlink" href="#arm-templates" title="Permalink to this headline">¶</a></h3>
+<p>Using Azure ARM templates it is possible to create a high availability (active-active/active-standby) pair of BIG-IP VE instances in Microsoft Azure.  F5 Networks have grouped the
+available templates into the following categories:</p>
+<p><em>Standalone</em></p>
+<blockquote>
+<div><p>These templates are used to deploy a single BIG-IP VE, these are primarily used for development testing or replacing/upgrading instances that form part of traditional fail-over
+clusters.</p>
+</div></blockquote>
+<p><em>Failover</em></p>
+<blockquote>
+<div><p>These templates are designed for the deployment of more that one BIG-IP VE in a ScaleN cluster, this would be similar to UWA existing, traditional, deployment methodologies.
+These clusters are primary deployed in replication of traditional Active/Standby BIG-IP deployments, in the case of UWA the nominated deployment pattern is from active/active.</p>
+</div></blockquote>
+<p><em>Autoscale</em></p>
+<blockquote>
+<div><p>These template types deploy a group of BIG-IP VE’s that scale in and out based on thresholds nominated, BIG-IP VE’s are all deployed as Active and are primarily used to scale
+out an individual L7 service on a single wildcard virtual.  Addition services can be provisioned using port remapping for these, these types of deployments rely upstream service
+to distribute traffic like DNS/GSLB or a platform’s built-in load balancer.</p>
+</div></blockquote>
+<p>With the recommended configuration of Active/Active, <strong>SourceNAT</strong> is needed to ensure the egress traffic traverse the same ingress BIG-IP.  Another, more advanced,
+alternative is to use Direct Server Return (DSR) in Azure LB that means that the Azure LB will not perform <em>Destination</em> NAT on the traffic which will arrive at the
+backend pool with the correct <em>destination</em> IP address, this is commonly used in scenarios that require 1 VIP per application within BIG-IP Cluster.</p>
+</div>
+<div class="section" id="declarative-onboarding-do">
+<h3>Declarative Onboarding (DO)<a class="headerlink" href="#declarative-onboarding-do" title="Permalink to this headline">¶</a></h3>
+<p>F5 Declarative Onboarding (DO) is an F5 offering that provides a framework to automate BIG-IP onboarding via Declarative REST APIs. Similar to AS3, DO provides a foundation to enable
+F5’s Infrastructure as Code (IaC) deployment methodologies.</p>
+<p>DO automates L1-L3 on-boarding for BIG-IP, making BIG-IP available on the network and ready to accept L4-L7 Application
+Services configurations.  The following example declaration on-boards a clustered BIG-IP system, further explanation of this can be found locate at <a class="reference external" href="https://clouddocs.f5.com/products/extensions/f5-declarative-onboarding/latest/clustering.html">Composing a Declarative Onboarding
+declaration for a cluster of BIG-IPs</a>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+        <span class="s2">&quot;schemaVersion&quot;</span><span class="p">:</span> <span class="s2">&quot;1.0.0&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Device&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;async&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;Onboard BIG-IP into an HA Pair&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;Common&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Tenant&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;hostname&quot;</span><span class="p">:</span> <span class="s2">&quot;bigip1.example.com&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;myLicense&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;License&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;licenseType&quot;</span><span class="p">:</span> <span class="s2">&quot;regKey&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;regKey&quot;</span><span class="p">:</span> <span class="s2">&quot;AAAAA-BBBBB-CCCCC-DDDDD-EEEEEEE&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;myDns&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;DNS&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;nameServers&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="s2">&quot;8.8.8.8&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;2001:4860:4860::8844&quot;</span>
+                <span class="p">],</span>
+                <span class="s2">&quot;search&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="s2">&quot;f5.com&quot;</span>
+                <span class="p">]</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;myNtp&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;NTP&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;servers&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="s2">&quot;0.pool.ntp.org&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;1.pool.ntp.org&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;2.pool.ntp.org&quot;</span>
+                <span class="p">],</span>
+                <span class="s2">&quot;timezone&quot;</span><span class="p">:</span> <span class="s2">&quot;UTC&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;root&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;User&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;userType&quot;</span><span class="p">:</span> <span class="s2">&quot;root&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;oldPassword&quot;</span><span class="p">:</span> <span class="s2">&quot;foo&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;newPassword&quot;</span><span class="p">:</span> <span class="s2">&quot;bar&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;admin&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;User&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;userType&quot;</span><span class="p">:</span> <span class="s2">&quot;regular&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;password&quot;</span><span class="p">:</span> <span class="s2">&quot;asdfjkl&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;shell&quot;</span><span class="p">:</span> <span class="s2">&quot;bash&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;anotherUser&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;User&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;userType&quot;</span><span class="p">:</span> <span class="s2">&quot;regular&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;password&quot;</span><span class="p">:</span> <span class="s2">&quot;foobar&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;partitionAccess&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;Common&quot;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;guest&quot;</span>
+                    <span class="p">}</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;myProvisioning&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Provision&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;ltm&quot;</span><span class="p">:</span> <span class="s2">&quot;nominal&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;internal&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;VLAN&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;tag&quot;</span><span class="p">:</span> <span class="mi">4093</span><span class="p">,</span>
+                <span class="s2">&quot;mtu&quot;</span><span class="p">:</span> <span class="mi">1500</span><span class="p">,</span>
+                <span class="s2">&quot;interfaces&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;1.2&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;tagged&quot;</span><span class="p">:</span> <span class="n">false</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;internal-self&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;SelfIp&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;address&quot;</span><span class="p">:</span> <span class="s2">&quot;10.10.0.100/24&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;vlan&quot;</span><span class="p">:</span> <span class="s2">&quot;internal&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;allowService&quot;</span><span class="p">:</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;trafficGroup&quot;</span><span class="p">:</span> <span class="s2">&quot;traffic-group-local-only&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;external&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;VLAN&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;tag&quot;</span><span class="p">:</span> <span class="mi">4094</span><span class="p">,</span>
+                <span class="s2">&quot;mtu&quot;</span><span class="p">:</span> <span class="mi">1500</span><span class="p">,</span>
+                <span class="s2">&quot;interfaces&quot;</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;1.1&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;tagged&quot;</span><span class="p">:</span> <span class="n">false</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;external-localself&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;SelfIp&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;address&quot;</span><span class="p">:</span> <span class="s2">&quot;10.20.0.100/24&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;vlan&quot;</span><span class="p">:</span> <span class="s2">&quot;external&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;allowService&quot;</span><span class="p">:</span> <span class="s2">&quot;none&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;trafficGroup&quot;</span><span class="p">:</span> <span class="s2">&quot;traffic-group-local-only&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;external-self&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;SelfIp&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;address&quot;</span><span class="p">:</span> <span class="s2">&quot;10.20.0.200/24&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;vlan&quot;</span><span class="p">:</span> <span class="s2">&quot;external&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;allowService&quot;</span><span class="p">:</span> <span class="s2">&quot;none&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;trafficGroup&quot;</span><span class="p">:</span> <span class="s2">&quot;traffic-group-1&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;default&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Route&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;gw&quot;</span><span class="p">:</span> <span class="s2">&quot;10.10.0.1&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;network&quot;</span><span class="p">:</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;mtu&quot;</span><span class="p">:</span> <span class="mi">1500</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;configsync&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;ConfigSync&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;configsyncIp&quot;</span><span class="p">:</span> <span class="s2">&quot;/Common/internal-self/address&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;failoverAddress&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;FailoverUnicast&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;address&quot;</span><span class="p">:</span> <span class="s2">&quot;/Common/internal-self/address&quot;</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;failoverGroup&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;DeviceGroup&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;sync-failover&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;members&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;bigip1.example.com&quot;</span><span class="p">,</span> <span class="s2">&quot;bigip2.example.com&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;owner&quot;</span><span class="p">:</span> <span class="s2">&quot;/Common/failoverGroup/members/0&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;autoSync&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+                <span class="s2">&quot;saveOnAutoSync&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+                <span class="s2">&quot;networkFailover&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+                <span class="s2">&quot;fullLoadOnSync&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+                <span class="s2">&quot;asmSync&quot;</span><span class="p">:</span> <span class="n">false</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;trust&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;DeviceTrust&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;localUsername&quot;</span><span class="p">:</span> <span class="s2">&quot;admin&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;localPassword&quot;</span><span class="p">:</span> <span class="s2">&quot;pass1word&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;remoteHost&quot;</span><span class="p">:</span> <span class="s2">&quot;/Common/failoverGroup/members/0&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;remoteUsername&quot;</span><span class="p">:</span> <span class="s2">&quot;admin&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;remotePassword&quot;</span><span class="p">:</span> <span class="s2">&quot;pass2word&quot;</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
+<p>F5 BIG-IP VE’s, once deployed, may be configured to either suit UWA DevOps methodology levering <a class="reference external" href="https://azure.microsoft.com/en-us/services/devops/">Azure DevOps</a> or in-house
+deployment pipelines.  As with the variations of provisioning of BIG-IP VE’s, the same variety exists to suit the provisioning of application services such as;</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#f5-application-services-templates-fast">F5 Application Services Templates (FAST)</a></p></li>
+<li><p><a class="reference internal" href="#application-services-3-extension-as3">Application Services 3 Extension (AS3)</a></p></li>
+<li><p><a class="reference internal" href="#ansible">Ansible</a></p></li>
+<li><p><a class="reference internal" href="#hashicorp">HashiCorp</a></p></li>
+</ul>
+<div class="section" id="f5-application-services-templates-fast">
+<h3>F5 Application Services Templates (FAST)<a class="headerlink" href="#f5-application-services-templates-fast" title="Permalink to this headline">¶</a></h3>
+<p>F5 FAST, provides a way to streamline deployment of AS3 applications onto BIG-IP using AS3 deployment patterns, or templates. FAST is the next phase of evolution for F5,
+unlocking new capabilities, aligning to multi-cloud, injecting automation, and empowering customers with our best-in-class application services.</p>
+<p>This allows, through the use of a tabbed gui within the BIG-IP console, the construction of Virtual Server configuration that produces a AS3 declaration that can be
+copied, committed to source or templates to be set as AS3 payloads on REST API operations.</p>
+<p>Further information, how-to’s and additional examples are located at the <a class="reference external" href="https://clouddocs.f5.com/products/extensions/f5-appsvcs-templates/latest/">FAST</a> documentation site.</p>
+</div>
+<div class="section" id="application-services-3-extension-as3">
+<h3>Application Services 3 Extension (AS3)<a class="headerlink" href="#application-services-3-extension-as3" title="Permalink to this headline">¶</a></h3>
+<p>Application Services 3 Extension is a flexible, low-overhead mechanism for managing application-specific configurations on a BIG-IP system. AS3 uses a declarative model, meaning
+you provide a JSON declaration rather than a set of imperative commands.</p>
+<p>The declaration represents the configuration which AS3 creates on a BIG-IP system. AS3 is well-defined
+according to the rules of JSON Schema, and declarations validate according to JSON Schema. AS3 accepts declaration updates via REST (push), reference (pull), or CLI (flat file editing).</p>
+<p>An example AS3 is as follows, this contains;</p>
+<ul class="simple">
+<li><p>Partition (Tenant) named <em>Sample_http_01</em></p></li>
+<li><p>HTTP VIP called <em>servceMain</em></p></li>
+<li><p>A pool named <em>web_pool</em></p></li>
+<li><p>Persistence provide based on JSESSIONID cookie</p></li>
+</ul>
+<div class="highlight-JSON notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;AS3&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;action&quot;</span><span class="p">:</span> <span class="s2">&quot;deploy&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;persist&quot;</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+  <span class="nt">&quot;declaration&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;ADC&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;schemaVersion&quot;</span><span class="p">:</span> <span class="s2">&quot;3.0.0&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;fghijkl7890&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;label&quot;</span><span class="p">:</span> <span class="s2">&quot;Sample 1&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;remark&quot;</span><span class="p">:</span> <span class="s2">&quot;HTTP with custom persistence&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Sample_http_01&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="nt">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Tenant&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;A1&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Application&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;template&quot;</span><span class="p">:</span> <span class="s2">&quot;http&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;serviceMain&quot;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="nt">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Service_HTTP&quot;</span><span class="p">,</span>
+          <span class="nt">&quot;virtualAddresses&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">&quot;10.0.6.10&quot;</span>
+          <span class="p">],</span>
+          <span class="nt">&quot;pool&quot;</span><span class="p">:</span> <span class="s2">&quot;web_pool&quot;</span><span class="p">,</span>
+          <span class="nt">&quot;persistenceMethods&quot;</span><span class="p">:</span> <span class="p">[{</span>
+            <span class="nt">&quot;use&quot;</span><span class="p">:</span> <span class="s2">&quot;jsessionid&quot;</span>
+          <span class="p">}]</span>
+        <span class="p">},</span>
+        <span class="nt">&quot;web_pool&quot;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="nt">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Pool&quot;</span><span class="p">,</span>
+          <span class="nt">&quot;monitors&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">&quot;http&quot;</span>
+          <span class="p">],</span>
+          <span class="nt">&quot;members&quot;</span><span class="p">:</span> <span class="p">[{</span>
+            <span class="nt">&quot;servicePort&quot;</span><span class="p">:</span> <span class="mi">80</span><span class="p">,</span>
+            <span class="nt">&quot;serverAddresses&quot;</span><span class="p">:</span> <span class="p">[</span>
+              <span class="s2">&quot;192.0.6.10&quot;</span><span class="p">,</span>
+              <span class="s2">&quot;192.0.6.11&quot;</span>
+            <span class="p">]</span>
+          <span class="p">}]</span>
+        <span class="p">},</span>
+        <span class="nt">&quot;jsessionid&quot;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="nt">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Persist&quot;</span><span class="p">,</span>
+          <span class="nt">&quot;persistenceMethod&quot;</span><span class="p">:</span> <span class="s2">&quot;cookie&quot;</span><span class="p">,</span>
+          <span class="nt">&quot;cookieMethod&quot;</span><span class="p">:</span> <span class="s2">&quot;hash&quot;</span><span class="p">,</span>
+          <span class="nt">&quot;cookieName&quot;</span><span class="p">:</span> <span class="s2">&quot;JSESSIONID&quot;</span>
+        <span class="p">}</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Further information, along with VSCode Schema validation, is currently located at <a class="reference external" href="https://clouddocs.f5.com/products/extensions/f5-appsvcs-extension/latest/">Application Services 3 Extension Documentation</a></p>
+</div>
+<div class="section" id="ansible">
+<h3>Ansible<a class="headerlink" href="#ansible" title="Permalink to this headline">¶</a></h3>
+<p>BIP-IP’s, both physical and virtual appliances, can also be provisioned, configured and managed with the application-deployment tool Anisble. From Ansible 2.9+ BIG-IP and BIG-IQ
+supports Ansible Galaxy, a website - Galaxy - where users can obtain collection of roles that also support <a class="reference external" href="https://galaxy.ansible.com/f5networks/f5_modules">F5 Ansible Galaxy Modules</a></p>
+<p>An example <a class="reference external" href="https://clouddocs.f5.com/products/orchestration/ansible/devel/usage/playbook_tutorial.html">Ansible playbook</a> declaration for configuration HA Pair of BIG-IP’s, Ansible templates - as below - using <a class="reference external" href="https://docs.ansible.com/ansible/latest/user_guide/playbooks_templating.html">Jinja2</a></p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+
+<span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Common HA configuration on all devices</span>
+  <span class="nt">hosts</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">f5-test</span>
+  <span class="nt">connection</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">local</span>
+
+  <span class="nt">vars</span><span class="p">:</span>
+    <span class="nt">provider</span><span class="p">:</span>
+      <span class="nt">server</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">ansible_host</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">server_port</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">f5_server_port</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">user</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">f5_username</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">password</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">f5_password</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">validate_certs</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">validate_certs</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+  <span class="nt">tasks</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">include_tasks</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">validate.yaml</span>
+
+    <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Add VLANs</span>
+      <span class="nt">bigip_vlan</span><span class="p">:</span>
+        <span class="nt">name</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item.vlan.name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">tag</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item.vlan.tag</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">untagged_interfaces</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item.vlan.interfaces</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">provider</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">provider</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">loop</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">nets</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+    <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Add Self-IPs</span>
+      <span class="nt">bigip_selfip</span><span class="p">:</span>
+        <span class="nt">name</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item.name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">address</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item.address</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">netmask</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item.netmask</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">vlan</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item.vlan.name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">provider</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">provider</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">allow_service</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">default</span>
+      <span class="nt">loop</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">nets</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+    <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Configure hostname</span>
+      <span class="nt">bigip_hostname</span><span class="p">:</span>
+        <span class="nt">hostname</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">inventory_hostname</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">provider</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">provider</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+    <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Set CMI device parameters</span>
+      <span class="nt">bigip_device_connectivity</span><span class="p">:</span>
+        <span class="nt">config_sync_ip</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">config_sync_ip</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">mirror_primary_address</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">mirror_primary_address</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">unicast_failover</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">unicast_failover</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">provider</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">provider</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Primary device specific configuration</span>
+  <span class="nt">hosts</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">f5-test[0]</span>
+  <span class="nt">connection</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">local</span>
+
+  <span class="nt">vars</span><span class="p">:</span>
+    <span class="nt">provider</span><span class="p">:</span>
+      <span class="nt">server</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">ansible_host</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">server_port</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">f5_server_port</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">user</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">f5_username</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">password</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">f5_password</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">validate_certs</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">validate_certs</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+  <span class="nt">tasks</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Trust peer device</span>
+      <span class="nt">bigip_device_trust</span><span class="p">:</span>
+        <span class="nt">peer_server</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">hostvars[item].ansible_host</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">peer_hostname</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">hostvars[item].inventory_hostname</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">peer_user</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">f5_username</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">peer_password</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">f5_password</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">provider</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">provider</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">loop</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">groups[&#39;f5-test&#39;][1:]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+    <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Add Device Group</span>
+      <span class="nt">bigip_device_group</span><span class="p">:</span>
+        <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">deviceGrp</span>
+        <span class="nt">auto_sync</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">yes</span>
+        <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">sync-failover</span>
+        <span class="nt">provider</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">provider</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+    <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Add members to the device group</span>
+      <span class="nt">bigip_device_group_member</span><span class="p">:</span>
+        <span class="nt">device_group</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">deviceGrp</span>
+        <span class="nt">name</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item</span><span class="nv"> </span><span class="s">}}&quot;</span>
+        <span class="nt">provider</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">provider</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="nt">loop</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">groups[&#39;f5-test&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+    <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Perform a config sync</span>
+      <span class="nt">bigip_configsync_action</span><span class="p">:</span>
+        <span class="nt">device_group</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">deviceGrp</span>
+        <span class="nt">sync_device_to_group</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">yes</span>
+        <span class="nt">provider</span><span class="p">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">provider</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>Further information, along with further references are located;</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.ansible.com/ansible/latest/user_guide/playbooks.html">Ansible Playbooks</a></p></li>
+<li><p><a class="reference external" href="https://www.ansible.com/products/tower">Ansible Tower</a></p></li>
+<li><p><a class="reference external" href="https://www.ansible.com/products/awx-project/faq">AWX</a></p></li>
+</ul>
+<p>Or how to run <a class="reference external" href="https://ansible.github.io/workshops/decks/ansible_f5.pdf">F5 Ansible Playbooks</a> for Tower and AWX.</p>
+</div>
+<div class="section" id="hashicorp">
+<h3>HashiCorp<a class="headerlink" href="#hashicorp" title="Permalink to this headline">¶</a></h3>
+<p>HashiCorp, the creators of Terraform OpenSource IaC, also have Terraform Cloud, the enterprise offering that supports divisions along with MFA and SSO, that incorporates Sentinel that enables the
+shift to multi-cloud infrastructure.  Like DO, AS3 and Ansible <a class="reference external" href="https://terraform.io">Terraform</a> also support DevOps pipelines and <a class="reference external" href="https://datasift.github.io/gitflow/IntroducingGitFlow.html">GitFlow</a>.</p>
+<p>An example Terraform Plan, <cite>main.tf</cite>, is defined as follows;</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>
+<span class="c1">#</span>
+<span class="c1"># Set minimum Terraform version and Terraform Cloud backend</span>
+<span class="c1">#</span>
+<span class="n">terraform</span> <span class="p">{</span>
+  <span class="n">required_version</span> <span class="o">=</span> <span class="s2">&quot;&gt;= 0.12&quot;</span>
+<span class="p">}</span>
+<span class="o">/*</span>
+<span class="c1"># Create a random id</span>
+<span class="o">*/</span>
+<span class="n">resource</span> <span class="s2">&quot;random_id&quot;</span> <span class="s2">&quot;id&quot;</span> <span class="p">{</span>
+  <span class="n">byte_length</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="p">}</span>
+<span class="o">/*</span>
+<span class="c1"># Create VPC as per requirements</span>
+<span class="o">*/</span>
+<span class="n">module</span> <span class="s2">&quot;vpc&quot;</span> <span class="p">{</span>
+  <span class="n">source</span> <span class="o">=</span> <span class="s2">&quot;../modules/services/network&quot;</span>
+
+  <span class="n">providers</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">aws</span> <span class="o">=</span> <span class="n">aws</span><span class="o">.</span><span class="n">secops</span>
+  <span class="p">}</span>
+
+  <span class="n">prefix</span> <span class="o">=</span> <span class="s2">&quot;$</span><span class="si">{var.project}</span><span class="s2">-$</span><span class="si">{var.environment}</span><span class="s2">&quot;</span>
+  <span class="n">cidr</span>   <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">cidr</span>
+  <span class="n">azs</span>    <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">azs</span>
+  <span class="n">env</span>    <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">environment</span>
+  <span class="n">random</span> <span class="o">=</span> <span class="n">random_id</span><span class="o">.</span><span class="n">id</span>
+
+<span class="p">}</span>
+<span class="o">/*</span>
+<span class="c1"># Create BIG-IP host as per requirements</span>
+<span class="o">*/</span>
+<span class="n">module</span> <span class="s2">&quot;bigip&quot;</span> <span class="p">{</span>
+  <span class="n">source</span> <span class="o">=</span> <span class="s2">&quot;../modules/functions/bigip&quot;</span>
+
+  <span class="n">providers</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">aws</span> <span class="o">=</span> <span class="n">aws</span><span class="o">.</span><span class="n">secops</span>
+  <span class="p">}</span>
+
+  <span class="n">prefix</span>           <span class="o">=</span> <span class="s2">&quot;$</span><span class="si">{var.project}</span><span class="s2">-$</span><span class="si">{var.environment}</span><span class="s2">&quot;</span>
+  <span class="n">cidr</span>             <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">cidr</span>
+  <span class="n">azs</span>              <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">azs</span>
+  <span class="n">env</span>              <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">environment</span>
+  <span class="n">vpcid</span>            <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">vpc</span><span class="o">.</span><span class="n">vpc_id</span>
+  <span class="n">public_subnets</span>   <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">vpc</span><span class="o">.</span><span class="n">public_subnets</span>
+  <span class="n">private_subnets</span>  <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">vpc</span><span class="o">.</span><span class="n">private_subnets</span>
+  <span class="n">database_subnets</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">vpc</span><span class="o">.</span><span class="n">database_subnets</span>
+  <span class="n">random</span>           <span class="o">=</span> <span class="n">random_id</span><span class="o">.</span><span class="n">id</span>
+  <span class="n">keyname</span>          <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">ec2_key_name</span>
+  <span class="n">keyfile</span>          <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">ec2_key_file</span>
+<span class="p">}</span>
+
+<span class="c1"># Create Jump host as per requirements</span>
+<span class="n">module</span> <span class="s2">&quot;jumphost&quot;</span> <span class="p">{</span>
+  <span class="n">source</span> <span class="o">=</span> <span class="s2">&quot;../modules/functions/jumphost&quot;</span>
+
+  <span class="n">providers</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">aws</span> <span class="o">=</span> <span class="n">aws</span><span class="o">.</span><span class="n">secops</span>
+  <span class="p">}</span>
+
+  <span class="n">prefix</span>            <span class="o">=</span> <span class="s2">&quot;$</span><span class="si">{var.project}</span><span class="s2">-$</span><span class="si">{var.environment}</span><span class="s2">&quot;</span>
+  <span class="n">region</span>            <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">region</span>
+  <span class="n">cidr</span>              <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">cidr</span>
+  <span class="n">azs</span>               <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">azs</span>
+  <span class="n">env</span>               <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">environment</span>
+  <span class="n">vpcid</span>             <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">vpc</span><span class="o">.</span><span class="n">vpc_id</span>
+  <span class="n">public_subnets</span>    <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">vpc</span><span class="o">.</span><span class="n">public_subnets</span>
+  <span class="n">public_nic_ids</span>    <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">bigip</span><span class="o">.</span><span class="n">public_nic_ids</span>
+  <span class="n">docker_private_ip</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">docker</span><span class="o">.</span><span class="n">docker_private_ip</span>
+  <span class="n">random</span>            <span class="o">=</span> <span class="n">random_id</span><span class="o">.</span><span class="n">id</span>
+  <span class="n">keyname</span>           <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">ec2_key_name</span>
+  <span class="n">keyfile</span>           <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">ec2_key_file</span>
+  <span class="n">bigip_mgmt_addr</span>   <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">bigip</span><span class="o">.</span><span class="n">mgmt_addresses</span>
+  <span class="n">bigip_mgmt_dns</span>    <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">bigip</span><span class="o">.</span><span class="n">mgmt_public_dns</span>
+  <span class="n">bigip_password</span>    <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">bigip</span><span class="o">.</span><span class="n">bigip_password</span>
+  <span class="n">bigip_private_add</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">bigip</span><span class="o">.</span><span class="n">private_addresses</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Further information on the use of Terraform;</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.terraform.io/docs/configuration/modules.html">Modules</a></p></li>
+<li><p><a class="reference external" href="https://www.terraform.io/docs/providers/bigip/index.html">Providers</a></p></li>
+</ul>
+<p>along with <a class="reference external" href="https://clouddocs.f5.com/products/orchestration/terraform/latest/userguide/installing.html">F5 Terraform Resources</a> that can also be found on <a class="reference external" href="https://clouddocs.f5.com/">F5 CloudDocs</a>.</p>
+</div>
+</div>
+<div class="section" id="monitoring-analytics">
+<h2>Monitoring &amp; Analytics<a class="headerlink" href="#monitoring-analytics" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="f5-automation-tool-chain-telemetry-streaming-ts">
+<h3>F5 Automation Tool Chain - Telemetry Streaming (TS)<a class="headerlink" href="#f5-automation-tool-chain-telemetry-streaming-ts" title="Permalink to this headline">¶</a></h3>
+<p>Consistent with IaC, Telemetry Streaming (TS) is F5 Networks JSON declarative model of streaming events and statistics to the customers preferred data visualization, it also supports native
+integration with both Microsoft Azure Log Analytics and Azure Application Insights along with other known logging solutions.</p>
+<p>For complete visibility BIG-IP and TS also integrate with <a class="reference external" href="https://devcentral.f5.com/s/articles/Integrating-the-F5-BIGIP-with-Azure-Sentinel">Azure Sentinel</a>.</p>
+<p><a class="reference external" href="https://clouddocs.f5.com/products/extensions/f5-telemetry-streaming/latest/">F5 Telemetry Streaming</a> also provides metrics and analytics to F5-aaS Cloud Offers along with rich application insights and understanding when deployed alongside <a class="reference external" href="https://www.f5.com/products/automation-and-orchestration/big-iq">BIG-IQ Centralised Management (CM)</a>.</p>
+<p>An example stanza for the configuration and declaration of TS is as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+    <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Telemetry&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;TS_System&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Telemetry_System&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;systemPoller&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;interval&quot;</span><span class="p">:</span> <span class="mi">60</span><span class="p">,</span>
+            <span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+            <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+            <span class="s2">&quot;actions&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;setTag&quot;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s2">&quot;tenant&quot;</span><span class="p">:</span> <span class="s2">&quot;`T`&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;application&quot;</span><span class="p">:</span> <span class="s2">&quot;`A`&quot;</span>
+                    <span class="p">},</span>
+                    <span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="n">true</span>
+                <span class="p">}</span>
+            <span class="p">]</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+        <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="mi">8100</span><span class="p">,</span>
+        <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;http&quot;</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;TS_Listener&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Telemetry_Listener&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="mi">6514</span><span class="p">,</span>
+        <span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+        <span class="s2">&quot;match&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;actions&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;setTag&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;tenant&quot;</span><span class="p">:</span> <span class="s2">&quot;`T`&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;application&quot;</span><span class="p">:</span> <span class="s2">&quot;`A`&quot;</span>
+                <span class="p">},</span>
+                <span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="n">true</span>
+            <span class="p">}</span>
+        <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;Poller&quot;</span><span class="p">:{</span> 
+       <span class="s2">&quot;class&quot;</span><span class="p">:</span><span class="s2">&quot;Telemetry_System_Poller&quot;</span><span class="p">,</span>
+       <span class="s2">&quot;interval&quot;</span><span class="p">:</span><span class="mi">60</span><span class="p">,</span>
+       <span class="s2">&quot;enable&quot;</span><span class="p">:</span><span class="n">true</span><span class="p">,</span>
+       <span class="s2">&quot;trace&quot;</span><span class="p">:</span><span class="n">false</span><span class="p">,</span>
+       <span class="s2">&quot;allowSelfSignedCert&quot;</span><span class="p">:</span><span class="n">false</span><span class="p">,</span>
+       <span class="s2">&quot;host&quot;</span><span class="p">:</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
+       <span class="s2">&quot;port&quot;</span><span class="p">:</span><span class="mi">8100</span><span class="p">,</span>
+       <span class="s2">&quot;protocol&quot;</span><span class="p">:</span><span class="s2">&quot;http&quot;</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;Beacon_Consumer&quot;</span><span class="p">:{</span> 
+        <span class="s2">&quot;class&quot;</span><span class="p">:</span><span class="s2">&quot;Telemetry_Consumer&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span><span class="s2">&quot;Generic_HTTP&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;host&quot;</span><span class="p">:</span><span class="s2">&quot;ingestion.ovr.prd.f5aas.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;protocol&quot;</span><span class="p">:</span><span class="s2">&quot;https&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;port&quot;</span><span class="p">:</span><span class="mi">50443</span><span class="p">,</span>
+        <span class="s2">&quot;path&quot;</span><span class="p">:</span><span class="s2">&quot;/beacon/v1/ingest-telemetry-streaming&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;method&quot;</span><span class="p">:</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;enable&quot;</span><span class="p">:</span><span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;trace&quot;</span><span class="p">:</span><span class="n">false</span><span class="p">,</span>
+        <span class="s2">&quot;headers&quot;</span><span class="p">:[</span> 
+           <span class="p">{</span> 
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span><span class="s2">&quot;grpc-metadata-x-f5-ingestion-token&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;value&quot;</span><span class="p">:</span><span class="s2">&quot;`&gt;@/passphrase`&quot;</span>
+           <span class="p">}</span>
+        <span class="p">],</span>
+        <span class="s2">&quot;passphrase&quot;</span><span class="p">:{</span> 
+            <span class="s2">&quot;cipherText&quot;</span><span class="p">:</span><span class="s2">&quot;&lt;it&#39;s one of those secret things&gt;&quot;</span>
+        <span class="p">}</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;Statsd_Consumer&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;Statsd&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;elk.local&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;udp&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Telemetry_Consumer&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="mi">8125</span><span class="p">,</span>
+        <span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">false</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;ElasticSearch_Consumer&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="s2">&quot;f5telemetryindex&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;http&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;dataType&quot;</span><span class="p">:</span> <span class="s2">&quot;_doc&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Telemetry_Consumer&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;elk.local&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ElasticSearch&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="mi">9200</span><span class="p">,</span>
+        <span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">false</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;SumoLogic_Consumer&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">languagelanguage</span>
+        <span class="s2">&quot;class&quot;</span><span class="p">:</span> <span class="s2">&quot;Telemetry_Consumer&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;Sumo_Logic&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;collectors.sumologic.com&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;https&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="mi">443</span><span class="p">,</span>
+        <span class="s2">&quot;enable&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+        <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="s2">&quot;/receiver/v1/http/&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;passphrase&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;cipherText&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;another one of those secrets&gt;&quot;</span>
+        <span class="p">}</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;schemaVersion&quot;</span><span class="p">:</span> <span class="s2">&quot;1.6.0&quot;</span>    
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The previous TS example creates a Virtual Server (VS) local listener on the BIG-IP appliance, port 6517, then a system poller with an interval of 60 seconds on port 8100 then finally configures
+three consumers of TS:</p>
+<ul class="simple">
+<li><p>F5a-aaS Beacon</p></li>
+<li><p>StatsD local listener</p></li>
+<li><p>ElasticSearch Indexes.</p></li>
+</ul>
+<p>BIG-IP High Speed Logging (HSL) shares a similar framework to that of Telemetry Streaming, this enables an ease of upgrade from HSL deployment.  Telemetry Streaming also support the
+redaction/masking of information on instance.</p>
+</div>
+</div>
+<div class="section" id="backup-and-restoration">
+<h2>Backup and Restoration<a class="headerlink" href="#backup-and-restoration" title="Permalink to this headline">¶</a></h2>
+<p>As with all Cloud Journeys the requirements for the backup and restoration of configuration is nullified to align with <a class="reference external" href="https://networking.cloud-native-principles.org/cloud-native-immutable-infrastructure-principles">Cloud Native Immutable Infrastructure Principals</a>.</p>
+<p>&gt; “The gold standard for cloud infrastructure is for it be able to be provisioned without any assistance. The tools that provision that infrastructure should accept declarative configuration as inputs.”</p>
+<p>F5 Automated Tool Chain combined with Azure ARM templates enables the ease of secure deployments in an agile manner, if the both the workload and data classification require it
+<a class="reference external" href="https://www.f5.com/solutions/secure-cloud-architecture">F5 Networks Secure Cloud Architecture (SCA) Solutions</a>.</p>
+<p>As with migrations, workload components need configuration up-lifted or refreshed and understanding this F5 offers assistance through both professional services and community channels
+within <a class="reference external" href="https://f5cloudsolutions.slack.com">Slack</a> or GitHub.</p>
+</div>
+<div class="section" id="recommendations">
+<h2>Recommendations<a class="headerlink" href="#recommendations" title="Permalink to this headline">¶</a></h2>
+<p>With cloud to align with the elasticity and immutability I believe that operating in the cloud requires automation, therefore one should not shy away from automated updates to User
+Defined Routing (UDR’s) given that tools such as F5’s Cloud Failover Extension (CFE) to be native with mature cloud operations.</p>
+<p>The use of BIG-IP v15.1.x also brings support for <a class="reference external" href="https://clouddocs.f5.com/cloud/public/v1/azure/Azure_accelNet.html">Accelerated Networking on Azure</a> that has support for SR-IOV.</p>
+<p>With outbound traffic traversing the BIG-IP as per the 3nic deployment pattern, it allows for the inspection, analysis, securing, etc - not only because it allows apps to see the true source IP.</p>
+<p>Finally, best practices to follow when on the early stages of a cloud journey;</p>
+<ul class="simple">
+<li><p>use of GitFlow or Git Branching DevOps</p></li>
+<li><p>use CI/CD tools, Azure DevOps, for speed of deployments</p></li>
+<li><p>template based deployments both non-prod and prod (IaC)</p></li>
+<li><p>use of DO and AS3 to keep configuration off box</p></li>
+<li><p>App &amp; Dev teams configuring partitioned BIG-IP using declarative deployments.</p></li>
+</ul>
+</div>
+<div class="section" id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
+<p>As it has been touched on there is multiple ways to deploy and dictate the architectural requirements of individual workloads, in a immutable declarative way that removes the need for
+break-glass and ClickOps configuration steps.   By framing the application flows/workloads as a series of objects rather than a single blob/entity it allows this flow, Code to Customer, to be
+simplified in all stages of the applications life-cycle.</p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">f5-uwa-cloud</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">UWA Recommendations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#uwa-ingest-vnet">UWA - Ingest VNET.</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#application-deployment-lifecycle">Application Deployment Lifecycle.</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#provisioning">Provisioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#monitoring-analytics">Monitoring &amp; Analytics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#backup-and-restoration">Backup and Restoration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#recommendations">Recommendations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conclusion">Conclusion</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to f5-uwa-cloud’s documentation!</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Michael Kennedy.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/UWA-Recommendations_draft-v0.10.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

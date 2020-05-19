@@ -1,0 +1,105 @@
+{
+    "class": "Telemetry",
+    "TS_System": {
+        "class": "Telemetry_System",
+        "systemPoller": {
+            "interval": 60,
+            "enable": true,
+            "trace": false,
+            "actions": [
+                {
+                    "setTag": {
+                        "tenant": "`T`",
+                        "application": "`A`"
+                    },
+                    "enable": true
+                }
+            ]
+        },
+        "enable": true,
+        "trace": false,
+        "host": "localhost",
+        "port": 8100,
+        "protocol": "http"
+    },
+    "TS_Listener": {
+        "class": "Telemetry_Listener",
+        "port": 6514,
+        "enable": true,
+        "trace": false,
+        "match": "",
+        "actions": [
+            {
+                "setTag": {
+                    "tenant": "`T`",
+                    "application": "`A`"
+                },
+                "enable": true
+            }
+        ]
+    },
+    "Poller":{ 
+       "class":"Telemetry_System_Poller",
+       "interval":60,
+       "enable":true,
+       "trace":false,
+       "allowSelfSignedCert":false,
+       "host":"localhost",
+       "port":8100,
+       "protocol":"http"
+    },
+    "Beacon_Consumer":{ 
+        "class":"Telemetry_Consumer",
+        "type":"Generic_HTTP",
+        "host":"ingestion.ovr.prd.f5aas.com",
+        "protocol":"https",
+        "port":50443,
+        "path":"/beacon/v1/ingest-telemetry-streaming",
+        "method":"POST",
+        "enable":true,
+        "trace":false,
+        "headers":[ 
+           { 
+            "name":"grpc-metadata-x-f5-ingestion-token",
+            "value":"`>@/passphrase`"
+           }
+        ],
+        "passphrase":{ 
+            "cipherText":"<it's one of those secret things>"
+        }
+    },
+    "Statsd_Consumer": {
+        "type": "Statsd",
+        "host": "elk.local",
+        "protocol": "udp",
+        "class": "Telemetry_Consumer",
+        "port": 8125,
+        "enable": true,
+        "trace": false
+    },
+    "ElasticSearch_Consumer": {
+        "index": "f5telemetryindex",
+        "protocol": "http",
+        "dataType": "_doc",
+        "class": "Telemetry_Consumer",
+        "host": "elk.local",
+        "type": "ElasticSearch",
+        "port": 9200,
+        "enable": true,
+        "trace": false
+    },
+    "SumoLogic_Consumer": {languagelanguage
+        "class": "Telemetry_Consumer",
+        "type": "Sumo_Logic",
+        "host": "collectors.sumologic.com",
+        "protocol": "https",
+        "port": 443,
+        "enable": true,
+        "trace": false,
+        "path": "/receiver/v1/http/",
+        "passphrase": {
+            "cipherText": "<another one of those secrets>"
+        }
+    },
+    "schemaVersion": "1.6.0"    
+}
