@@ -88,7 +88,7 @@
         "enable": true,
         "trace": false
     },
-    "SumoLogic_Consumer": {languagelanguage
+    "SumoLogic_Consumer": {
         "class": "Telemetry_Consumer",
         "type": "Sumo_Logic",
         "host": "collectors.sumologic.com",
