@@ -21,7 +21,7 @@ Benefits
 * Minimal affect to the customer’s existing setup 
 * All the same benefits as HA failover-via LB solution 
 
-Requirements: 
+Requirements 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * SNAT is required 
